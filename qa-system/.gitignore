@@ -1,0 +1,2 @@
+datasets/squad/raw/*
+embeddings/glove/*

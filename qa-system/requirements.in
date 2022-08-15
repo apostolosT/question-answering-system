@@ -6,6 +6,7 @@ matplotlib
 nltk
 pytest
 pytorch-lightning==1.6.3
+torchtext
 torchmetrics<0.8
 wandb==0.12.17
 flake8

@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import pickle
 from src.data import utils
 
@@ -7,6 +8,41 @@ TRAIN_SET_PATH = 'datasets/squad/raw/SQuAD-v1.1-train.json'
 VAL_SET_PATH = 'datasets/squad/raw/SQuAD-v1.1-dev.json'
 PROCESSED_TRAIN_SET_PATH = 'datasets/squad/processed/train.pickle'
 PROCESSED_VAL_SET_PATH = 'datasets/squad/processed/val.pickle'
+EMBEDDINGS_PATH = 'embeddings/glove/glove.6B.300d.txt'
+WEIGHT_MATRIX_PATH = 'datasets/squad/processed/weights-matrix.npy'
+
+
+def create_glove_matrix():
+    '''
+    Parses the glove word vectors text file and returns a dictionary with the words as
+    keys and their respective pretrained word vectors as values.
+
+    '''
+    glove_dict = {}
+    with open(EMBEDDINGS_PATH, "r", encoding="utf-8") as f:
+        for line in f:
+            values = line.split(' ')
+            word = values[0]
+            vector = np.asarray(values[1:], dtype="float32")
+            glove_dict[word] = vector
+
+    return glove_dict
+
+def create_word_embedding(glove_dict, word_vocab):
+    '''
+    Creates a weight matrix of the words that are common in the GloVe vocab and
+    the dataset's vocab. Initializes OOV words with a zero vector.
+    '''
+    weights_matrix = np.zeros((len(word_vocab), 300))
+    words_found = 0
+    for i, word in enumerate(word_vocab):
+        try:
+            weights_matrix[i] = glove_dict[word]
+            words_found += 1
+        except Exception:
+            pass
+    return weights_matrix, words_found
+
 
 def make_dataset():
 
@@ -24,6 +60,11 @@ def make_dataset():
     print("Building word vocabulary...")
     vocab_text = utils.gather_text_for_vocab([train_df, val_df])
     word2idx, idx2word, word_vocab = utils.build_word_vocab(vocab_text)
+
+    glove_dict = create_glove_matrix()
+    weights_matrix, words_found = create_word_embedding(glove_dict, word_vocab)
+    print("Total words found in glove vocab: ", words_found)
+    np.save(WEIGHT_MATRIX_PATH, weights_matrix)
 
     # convert tokens in sentences to their respective idx
     print("Converting context tokens to their respective index, this may take a while...")

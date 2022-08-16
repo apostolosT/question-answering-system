@@ -60,7 +60,7 @@ class StackedBiRNN(nn.Module):
 
             input_dim = input_dim if i == 0 else hidden_dim * 2
 
-            self.rnns.append(nn.GRU(input_dim, hidden_dim,
+            self.rnns.append(nn.LSTM(input_dim, hidden_dim,
                              batch_first=True, bidirectional=True))
 
     def forward(self, x):

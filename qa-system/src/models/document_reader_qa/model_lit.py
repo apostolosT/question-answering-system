@@ -8,13 +8,13 @@ from torch import nn
 
 class qaLightning(pl.LightningModule):
 
-    def __init__(self, model, optimizer_lr=0.01, device=None, idx2word=None, evaluate_func=None):
+    def __init__(self, model, optimizer_lr=0.001, device=None, idx2word=None, evaluate_func=None):
         super().__init__()
         self.model = model
         self.lr = optimizer_lr
         self.device_ = device
-        if device:
-            model = model.to(device)
+        # if device:
+            # model = model.to(device)
         if not idx2word:
             raise NotImplementedError("idx2word not defined")
         if not evaluate_func:
@@ -27,12 +27,12 @@ class qaLightning(pl.LightningModule):
         context, question, context_mask, question_mask, label, ctx, ans, ids = batch
 
         # place the tensors on GPU if not already there
-        if self.device and not context.is_cuda:
-            context = context.to(self.device)
-            question = question.to(self.device)
-            context_mask = context_mask.to(self.device)
-            question_mask = question_mask.to(self.device)
-            label = label.to(self.device)
+        # if self.device and not context.is_cuda:
+        #     context = context.to(self.device)
+        #     question = question.to(self.device)
+        #     context_mask = context_mask.to(self.device)
+        #     question_mask = question_mask.to(self.device)
+        #     label = label.to(self.device)
         preds = self.model(context, question, context_mask, question_mask)
 
         # forward pass, get the predictions
@@ -44,18 +44,17 @@ class qaLightning(pl.LightningModule):
             F.cross_entropy(end_pred, end_label)
 
         self.log('loss', loss.item(), on_step=True, on_epoch=True)
-
         return loss
 
     def validation_step(self, batch, batch_idx):
         context, question, context_mask, question_mask, label, ctx, ans, ids = batch
 
-        if self.device and not context.is_cuda:
-            context = context.to(self.device)
-            question = question.to(self.device)
-            context_mask = context_mask.to(self.device)
-            question_mask = question_mask.to(self.device)
-            label = label.to(self.device)
+        # if self.device and not context.is_cuda:
+        #     context = context.to(self.device)
+        #     question = question.to(self.device)
+        #     context_mask = context_mask.to(self.device)
+        #     question_mask = question_mask.to(self.device)
+        #     label = label.to(self.device)
         # place the tensors on GPU
 
         preds = self.model(context, question, context_mask, question_mask)
@@ -69,7 +68,7 @@ class qaLightning(pl.LightningModule):
 
         loss = F.cross_entropy(p1, y1) + F.cross_entropy(p2, y2)
 
-        self.log('valid_loss', loss, on_step=True, on_epoch=True)
+        self.log('val_loss', loss, on_step=True, on_epoch=True)
 
         predictions = {}
         answers = {}
@@ -91,26 +90,19 @@ class qaLightning(pl.LightningModule):
             pred = ' '.join([self.idx2word[idx.item()] for idx in pred])
             predictions[id] = pred
             answers[id] = ans[i]
-
         return (predictions, answers)
 
     def training_epoch_end(self, training_step_outputs):
         loss = [x['loss'].item() for x in training_step_outputs]
         self.log('avg_epoch_loss', sum(loss) / len(loss))
-        predictions = dict(ChainMap(*[x[0] for x in training_step_outputs]))
-        answers = dict(ChainMap(*[x[1] for x in training_step_outputs]))
-        em, f1 = self.evaluate_func(predictions, answers=answers)
-        self.log("train_em", em)
-        self.log("val_f1", f1)
 
     def validation_epoch_end(self, validation_step_outputs):
         # Unpack dicts
         predictions = dict(ChainMap(*[x[0] for x in validation_step_outputs]))
         answers = dict(ChainMap(*[x[1] for x in validation_step_outputs]))
-
         em, f1 = self.evaluate_func(predictions, answers=answers)
-        print(em)
-        print(f1)
+
+        print(f"\n em: {em}, f1: {f1} \n")
         self.log("val_em", em)
         self.log("val_f1", f1)
 

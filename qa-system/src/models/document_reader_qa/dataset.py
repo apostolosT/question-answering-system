@@ -16,6 +16,7 @@ class QuADataset(Dataset):
         """
 
         self.df = pd.read_pickle(pickle_file_path)
+        # self.df = self.df[:100]
         self.max_context_length = max(len(ctx) for ctx in self.df.context_ids)
         self.max_question_length = max(len(ctx) for ctx in self.df.question_ids)
 
@@ -47,8 +48,7 @@ class QuADataset(Dataset):
         context_mask = torch.eq(padded_context, 1)
         question_mask = torch.eq(padded_question, 1)
 
-        ids = batch.id[0]  # index start
-
+        id = batch.id
         return (
             padded_context,
             padded_question,
@@ -57,7 +57,7 @@ class QuADataset(Dataset):
             label,
             context_text,
             answer_text,
-            ids
+            id
         )
 
     def get_span(self, text):

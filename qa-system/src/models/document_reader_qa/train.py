@@ -6,7 +6,8 @@ from collections import Counter
 
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 from src.models.document_reader_qa.model import QuAModel
 from src.models.document_reader_qa.dataset import QuADataset
@@ -63,20 +64,42 @@ def train():
         idx2word=idx2word,
         evaluate_func=evaluate_func,
         device=device,
-        optimizer_lr=0.002)
+        optimizer_lr=0.001)
 
-    # wandb_logger = WandbLogger(project="legal-contract-analysis")
+    val_checkpoint = ModelCheckpoint(
+        filename="{epoch}-{step}-{val_loss:.1f}",
+        monitor="val_loss",
+        mode="min",
+        save_top_k=-1
+    )
+
+    latest_checkpoint = ModelCheckpoint(
+        filename="latest-{epoch}-{step}",
+        monitor="step",
+        mode="max",
+        every_n_train_steps=500,
+        save_top_k=1
+    )
+
+    early_stopping = EarlyStopping(
+        monitor="val_loss",
+        mode="min",
+        patience=1
+    )
+
+    logger = TensorBoardLogger('tb_logs', name='dr_model')
 
     trainer = pl.Trainer(
         max_epochs=5,
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
         gradient_clip_val=10,
-        progress_bar_refresh_rate=20,
         devices=1,
         callbacks=[
-            pl.callbacks.ModelCheckpoint(dirpath="checkpoints/", monitor="dev_loss", mode="min"),
-            pl.callbacks.EarlyStopping(monitor="dev_loss", mode="min", patience=5),
+            val_checkpoint,
+            latest_checkpoint,
+            early_stopping
         ],
+        logger=logger,
         default_root_dir='../../../models'
     )
 
@@ -125,7 +148,6 @@ def evaluate(predictions, **kwargs):
 
     exact_match = 100.0 * exact_match / total
     f1 = 100.0 * f1 / total
-
     return exact_match, f1
 
 

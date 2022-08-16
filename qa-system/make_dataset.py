@@ -73,8 +73,8 @@ def make_dataset():
     train_df['context_ids'] = train_df.context.apply(utils.context_to_ids, word2idx=word2idx)
     val_df['context_ids'] = val_df.context.apply(utils.context_to_ids, word2idx=word2idx)
 
-    train_df['question_ids'] = train_df.context.apply(utils.question_to_ids, word2idx=word2idx)
-    val_df['question_ids'] = val_df.context.apply(utils.question_to_ids, word2idx=word2idx)
+    train_df['question_ids'] = train_df.question.apply(utils.question_to_ids, word2idx=word2idx)
+    val_df['question_ids'] = val_df.question.apply(utils.question_to_ids, word2idx=word2idx)
 
     # get indices with tokenization errors and drop those indices
     train_err = utils.get_error_indices(train_df, idx2word)
@@ -100,8 +100,8 @@ def make_dataset():
     with open(WORD_VOCAB_PATH, 'wb') as f:
         pickle.dump(word_vocab, f)
 
-    # train_df.to_pickle(PROCESSED_TRAIN_SET_PATH)
-    # val_df.to_pickle(PROCESSED_VAL_SET_PATH)
+    train_df.to_pickle(PROCESSED_TRAIN_SET_PATH)
+    val_df.to_pickle(PROCESSED_VAL_SET_PATH)
 
 if __name__ == "__main__":
     make_dataset()

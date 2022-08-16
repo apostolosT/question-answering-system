@@ -6,10 +6,10 @@ import spacy
 
 nlp = spacy.load('en_core_web_sm', disable=["tagger", "ner", "lemmatizer"])
 
-class DocumentReaderQADataset(Dataset):
+class QuADataset(Dataset):
     def __init__(self, pickle_file_path):
         """
-        Dataset for the DocumentReader QA system and its variations
+        Dataset for the QuAModel QA system and its variations
 
         Args:
             pickle_file_path: The pickled train/val dataset
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     g.manual_seed(10)
     cwd = os.getcwd()
     train_path = f"{cwd}/datasets/squad/processed/train.pickle"
-    train_dataset = DocumentReaderQADataset(train_path)
+    train_dataset = QuADataset(train_path)
     print(len(train_dataset))
     train_dataset.df = train_dataset.df[0:10]
     print(len(train_dataset))

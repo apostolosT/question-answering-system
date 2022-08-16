@@ -4,6 +4,8 @@ import pickle
 from src.data import utils
 
 WORD2IDX_PATH = 'datasets/squad/processed/word2idx.pickle'
+IDX2WORD_PATH = 'datasets/squad/processed/idx2word.pickle'
+WORD_VOCAB_PATH = 'datasets/squad/processed/word_vocab.pickle'
 TRAIN_SET_PATH = 'datasets/squad/raw/SQuAD-v1.1-train.json'
 VAL_SET_PATH = 'datasets/squad/raw/SQuAD-v1.1-dev.json'
 PROCESSED_TRAIN_SET_PATH = 'datasets/squad/processed/train.pickle'
@@ -93,9 +95,13 @@ def make_dataset():
     print("Dumping data to '/datasets/squad/processed/'")
     with open(WORD2IDX_PATH, 'wb') as f:
         pickle.dump(word2idx, f)
+    with open(IDX2WORD_PATH, 'wb') as f:
+        pickle.dump(idx2word, f)
+    with open(WORD_VOCAB_PATH, 'wb') as f:
+        pickle.dump(word_vocab, f)
 
-    train_df.to_pickle(PROCESSED_TRAIN_SET_PATH)
-    val_df.to_pickle(PROCESSED_VAL_SET_PATH)
+    # train_df.to_pickle(PROCESSED_TRAIN_SET_PATH)
+    # val_df.to_pickle(PROCESSED_VAL_SET_PATH)
 
 if __name__ == "__main__":
     make_dataset()

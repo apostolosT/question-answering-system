@@ -18,7 +18,8 @@ class qaLightning(pl.LightningModule):
         if not idx2word:
             raise NotImplementedError("idx2word not defined")
         if not evaluate_func:
-            raise NotImplementedError("Evaluation Function for validation not defined")
+            raise NotImplementedError(
+                "Evaluation Function for validation not defined")
         self.idx2word = idx2word
         self.evaluate_func = evaluate_func
 
@@ -27,10 +28,10 @@ class qaLightning(pl.LightningModule):
 
         # place the tensors on GPU if not already there
         if self.device and not context.is_cuda:
-            context = context.to(self.device) 
-            question = question.to(self.device) 
+            context = context.to(self.device)
+            question = question.to(self.device)
             context_mask = context_mask.to(self.device)
-            question_mask = question_mask.to(self.device) 
+            question_mask = question_mask.to(self.device)
             label = label.to(self.device)
         preds = self.model(context, question, context_mask, question_mask)
 
@@ -39,7 +40,8 @@ class qaLightning(pl.LightningModule):
         # separate labels for start and end position
         start_label, end_label = label[:, 0], label[:, 1]
         # calculate loss
-        loss = F.cross_entropy(start_pred, start_label) + F.cross_entropy(end_pred, end_label)
+        loss = F.cross_entropy(start_pred, start_label) + \
+            F.cross_entropy(end_pred, end_label)
 
         self.log('loss', loss.item(), on_step=True, on_epoch=True)
 
@@ -49,11 +51,11 @@ class qaLightning(pl.LightningModule):
         context, question, context_mask, question_mask, label, ctx, ans, ids = batch
 
         if self.device and not context.is_cuda:
-            context = context.to(self.device) 
-            question = question.to(self.device) 
+            context = context.to(self.device)
+            question = question.to(self.device)
             context_mask = context_mask.to(self.device)
-            question_mask = question_mask.to(self.device) 
-            label = label.to(self.device) 
+            question_mask = question_mask.to(self.device)
+            label = label.to(self.device)
         # place the tensors on GPU
 
         preds = self.model(context, question, context_mask, question_mask)
@@ -65,12 +67,6 @@ class qaLightning(pl.LightningModule):
 
         y1, y2 = label[:, 0], label[:, 1]
 
-        # Maybe dont send to cpu yet
-        if self.device:
-            p1 = p1.to('cpu')
-            p2 = p2.to('cpu')
-            y1 = y1.to('cpu')
-            y2 = y2.to('cpu')
         loss = F.cross_entropy(p1, y1) + F.cross_entropy(p2, y2)
 
         self.log('valid_loss', loss, on_step=True, on_epoch=True)
@@ -78,8 +74,8 @@ class qaLightning(pl.LightningModule):
         predictions = {}
         answers = {}
         ls = nn.LogSoftmax(dim=1)
-        mask = (torch.ones(c_len, c_len) * float('-inf')).tril(-1).unsqueeze(0).expand(batch_size, -1, -1)
-
+        mask = (torch.ones(c_len, c_len, device=self.device) * float('-inf')
+                ).tril(-1).unsqueeze(0).expand(batch_size, -1, -1)
         score = (ls(p1).unsqueeze(2) + ls(p2).unsqueeze(1)) + mask
         score, s_idx = score.max(dim=1)
         score, e_idx = score.max(dim=1)
@@ -101,6 +97,11 @@ class qaLightning(pl.LightningModule):
     def training_epoch_end(self, training_step_outputs):
         loss = [x['loss'].item() for x in training_step_outputs]
         self.log('avg_epoch_loss', sum(loss) / len(loss))
+        predictions = dict(ChainMap(*[x[0] for x in training_step_outputs]))
+        answers = dict(ChainMap(*[x[1] for x in training_step_outputs]))
+        em, f1 = self.evaluate_func(predictions, answers=answers)
+        self.log("train_em", em)
+        self.log("val_f1", f1)
 
     def validation_epoch_end(self, validation_step_outputs):
         # Unpack dicts

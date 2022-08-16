@@ -8,8 +8,8 @@ import pytorch_lightning as pl
 import torch
 from pytorch_lightning.loggers import WandbLogger
 
-from src.models.document_reader_qa.model import DocumentReader
-from src.models.document_reader_qa.dataset import DocumentReaderQADataset
+from src.models.document_reader_qa.model import QuAModel
+from src.models.document_reader_qa.dataset import QuADataset
 from src.models.document_reader_qa.model_lit import qaLightning
 
 
@@ -21,25 +21,23 @@ def train():
     g = torch.Generator()
     g.manual_seed(10)
 
-    cwd = os.getcwd()
     train_path = "../../../datasets/squad/processed/train.pickle"
-    train_set = DocumentReaderQADataset(train_path)
+    train_set = QuADataset(train_path)
     val_path = "../../../datasets/squad/processed/val.pickle"
-    val_set = DocumentReaderQADataset(val_path)
+    val_set = QuADataset(val_path)
     # Reduce size for testing
 
     trainloader = torch.utils.data.DataLoader(
         train_set,
-        batch_size=32,
+        batch_size=16,
         shuffle=False,
     )
 
     validloader = torch.utils.data.DataLoader(
         val_set,
-        batch_size=32,
-        num_workers=6
+        batch_size=16,
     )
-    with open("../../../datasets/squad/processed/word2idx.pickle", 'rb') as file:
+    with open("../../../datasets/squad/processed/idx2word.pickle", 'rb') as file:
         import pickle
         idx2word = pickle.load(file)
     evaluate_func = evaluate
@@ -51,19 +49,36 @@ def train():
     DROPOUT = 0.3
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    model = DocumentReader(HIDDEN_DIM,
-                           EMB_DIM,
-                           NUM_LAYERS,
-                           NUM_DIRECTIONS,
-                           DROPOUT,
-                           device,
-                           "../../../datasets/squad/processed/weights-matrix.npy").to(device)
+    model = QuAModel(
+        HIDDEN_DIM,
+        EMB_DIM,
+        NUM_LAYERS,
+        NUM_DIRECTIONS,
+        DROPOUT,
+        device,
+        "../../../datasets/squad/processed/weights-matrix.npy")
 
-    litmodel = qaLightning(model, idx2word=idx2word, device=device,
-                           evaluate_func=evaluate_func, optimizer_lr=0.002)
-    wandb_logger = WandbLogger(project="legal-contract-analysis")
-    trainer = pl.Trainer(max_epochs=5, gpus=1, logger=wandb_logger,
-                         gradient_clip_val=10, profiler="simple")
+    litmodel = qaLightning(
+        model,
+        idx2word=idx2word,
+        evaluate_func=evaluate_func,
+        device=device,
+        optimizer_lr=0.002)
+
+    # wandb_logger = WandbLogger(project="legal-contract-analysis")
+
+    trainer = pl.Trainer(
+        max_epochs=5,
+        accelerator="gpu" if torch.cuda.is_available() else "cpu",
+        gradient_clip_val=10,
+        progress_bar_refresh_rate=20,
+        devices=1,
+        callbacks=[
+            pl.callbacks.ModelCheckpoint(dirpath="checkpoints/", monitor="dev_loss", mode="min"),
+            pl.callbacks.EarlyStopping(monitor="dev_loss", mode="min", patience=5),
+        ],
+        default_root_dir='../../../models'
+    )
 
     trainer.fit(litmodel, trainloader, validloader)
 
@@ -71,22 +86,22 @@ def train():
 def evaluate(predictions, **kwargs):
     '''
     Gets a dictionary of predictions with question_id as key
-    and prediction as value. The validation dataset has multiple 
+    and prediction as value. The validation dataset has multiple
     answers for a single question. Hence we compare our prediction
     with all the answers and choose the one that gives us
-    the maximum metric (em or f1). 
+    the maximum metric (em or f1).
     This method first parses the JSON file, gets all the answers
-    for a given id and then passes the list of answers and the 
+    for a given id and then passes the list of answers and the
     predictions to calculate em, f1.
     :param dict predictions
     Returns
-    : exact_match: 1 if the prediction and ground truth 
-      match exactly, 0 otherwise.
-    : f1_score: 
+    : exact_match: 1 if the prediction and ground truth
+      match exactly, 0 otherwise
+    : f1_score:
     '''
 
     # TODO: Change to correct directory
-    with open('./data/raw/dev-v1.1.json', 'r', encoding='utf-8') as f:
+    with open('../../../datasets/squad/raw/SQuAD-v1.1-dev.json', 'r', encoding='utf-8') as f:
         dataset = json.load(f)
 
     dataset = dataset['data']
@@ -117,18 +132,18 @@ def evaluate(predictions, **kwargs):
 def evaluate_single(predictions, answers, **kwargs):
     '''
     Gets a dictionary of predictions with question_id as key
-    and prediction as value. The validation dataset has multiple 
+    and prediction as value. The validation dataset has multiple
     answers for a single question. Hence we compare our prediction
     with all the answers and choose the one that gives us
-    the maximum metric (em or f1). 
+    the maximum metric (em or f1).
     This method first parses the JSON file, gets all the answers
-    for a given id and then passes the list of answers and the 
+    for a given id and then passes the list of answers and the
     predictions to calculate em, f1.
     :param dict predictions
     Returns
-    : exact_match: 1 if the prediction and ground truth 
+    : exact_match: 1 if the prediction and ground truth
       match exactly, 0 otherwise.
-    : f1_score: 
+    : f1_score:
     '''
     assert len(predictions) == len(answers)
     f1 = exact_match = total = 0
@@ -150,7 +165,7 @@ def evaluate_single(predictions, answers, **kwargs):
 
 def normalize_answer(s):
     '''
-    Performs a series of cleaning steps on the ground truth and 
+    Performs a series of cleaning steps on the ground truth and
     predicted answer.
     '''
     def remove_articles(text):
@@ -176,7 +191,7 @@ def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
     :param func metric_fn: can be 'exact_match_score' or 'f1_score'
     :param str prediction: predicted answer span by the model
     :param list ground_truths: list of ground truths against which
-                               metrics are calculated. Maximum values of 
+                               metrics are calculated. Maximum values of
                                metrics are chosen.
     '''
     scores_for_ground_truths = []

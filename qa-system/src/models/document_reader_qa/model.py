@@ -1,13 +1,10 @@
 """Download and pre-process drqa model for Q&A
 Code adapted from:
     > https://github.com/kushalj001/pytorch-question-answering
-Author:
-    Gustav Hartz (s174315@student.dtu.dk)
 """
 import numpy as np
 import torch
 import torch.nn.functional as F
-import torchtext
 from torch import nn
 
 # Modules
@@ -15,7 +12,7 @@ from torch import nn
 
 class AlignQuestionEmbedding(nn.Module):
 
-    def __init__(self, input_dim):        
+    def __init__(self, input_dim):
 
         super().__init__()
 
@@ -63,7 +60,8 @@ class StackedBiRNN(nn.Module):
 
             input_dim = input_dim if i == 0 else hidden_dim * 2
 
-            self.rnns.append(nn.GRU(input_dim, hidden_dim, batch_first=True, bidirectional=True))
+            self.rnns.append(nn.GRU(input_dim, hidden_dim,
+                             batch_first=True, bidirectional=True))
 
     def forward(self, x):
 
@@ -99,7 +97,8 @@ class LinearAttentionLayer(nn.Module):
 
         attn_scores = attn_scores.view(question.shape[0], question.shape[1])
 
-        attn_scores = attn_scores.masked_fill(question_mask == 1, -float('inf'))
+        attn_scores = attn_scores.masked_fill(
+            question_mask == 1, -float('inf'))
 
         alpha = F.softmax(attn_scores, dim=1)
 
@@ -138,17 +137,17 @@ class BilinearAttentionLayer(nn.Module):
         return scores
 
 
-class DocumentReader(nn.Module):
+class QuAModel(nn.Module):
 
     def __init__(self, hidden_dim, embedding_dim, num_layers, num_directions, dropout, device, glove_matrix_path):
 
         super().__init__()
 
-        self.device_ = device
+        self.context_birnn = StackedBiRNN(
+            embedding_dim * 2, hidden_dim, num_layers, dropout)
 
-        self.context_birnn = StackedBiRNN(embedding_dim * 2, hidden_dim, num_layers, dropout)
-
-        self.question_birnn = StackedBiRNN(embedding_dim, hidden_dim, num_layers, dropout)
+        self.question_birnn = StackedBiRNN(
+            embedding_dim, hidden_dim, num_layers, dropout)
 
         self.glove_embedding = self.get_glove_embedding(glove_matrix_path)
 
@@ -160,9 +159,10 @@ class DocumentReader(nn.Module):
 
         self.align_embedding = AlignQuestionEmbedding(embedding_dim)
 
-        self.linear_attn_question = LinearAttentionLayer(hidden_dim * num_layers * num_directions) 
+        self.linear_attn_question = LinearAttentionLayer(
+            hidden_dim * num_layers * num_directions)
 
-        self.bilinear_attn_start = BilinearAttentionLayer(hidden_dim * num_layers * num_directions, 
+        self.bilinear_attn_start = BilinearAttentionLayer(hidden_dim * num_layers * num_directions,
                                                           hidden_dim * num_layers * num_directions)
 
         self.bilinear_attn_end = BilinearAttentionLayer(hidden_dim * num_layers * num_directions,
@@ -174,7 +174,8 @@ class DocumentReader(nn.Module):
 
         weights_matrix = np.load(glove_matrix_path)
         num_embeddings, embedding_dim = weights_matrix.shape
-        embedding = nn.Embedding.from_pretrained(torch.FloatTensor(weights_matrix), freeze=False)
+        embedding = nn.Embedding.from_pretrained(
+            torch.FloatTensor(weights_matrix), freeze=False)
 
         return embedding
 
@@ -188,7 +189,8 @@ class DocumentReader(nn.Module):
 
         ques_embed = self.dropout(ques_embed)
 
-        align_embed = self.align_embedding(ctx_embed, ques_embed, question_mask)
+        align_embed = self.align_embedding(
+            ctx_embed, ques_embed, question_mask)
 
         ctx_birnn_input = torch.cat([ctx_embed, align_embed], dim=2)
 
@@ -200,8 +202,10 @@ class DocumentReader(nn.Module):
 
         qtn_weighted = weighted_average(qtn_outputs, qtn_weights)
 
-        start_scores = self.bilinear_attn_start(ctx_outputs, qtn_weighted, context_mask)
+        start_scores = self.bilinear_attn_start(
+            ctx_outputs, qtn_weighted, context_mask)
 
-        end_scores = self.bilinear_attn_end(ctx_outputs, qtn_weighted, context_mask)
+        end_scores = self.bilinear_attn_end(
+            ctx_outputs, qtn_weighted, context_mask)
 
         return start_scores, end_scores

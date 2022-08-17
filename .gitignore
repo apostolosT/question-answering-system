@@ -146,3 +146,9 @@ data/raw/*
 lightning_logs/
 
 wandb/
+.~lock.AISERA NLP Coding exercise.docx#
+AISERA NLP Coding exercise.docx
+qa-system/datasets/squad/processed/*
+qa-system/models/*
+qa-system/embeddings/*
+

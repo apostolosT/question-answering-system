@@ -185,7 +185,7 @@ def context_to_ids(text, word2idx):
 
     context_tokens = [w.text for w in nlp(
         text, disable=['parser', 'tagger', 'ner'])]
-    context_ids = [word2idx[word] for word in context_tokens]
+    context_ids = [word2idx_mapper(word2idx, word) for word in context_tokens]
 
     assert len(context_ids) == len(context_tokens)
     return context_ids
@@ -206,11 +206,10 @@ def question_to_ids(text, word2idx):
 
     question_tokens = [w.text for w in nlp(
         text, disable=['parser', 'tagger', 'ner'])]
-    question_ids = [word2idx[word] for word in question_tokens]
+    question_ids = [word2idx_mapper(word2idx, word) for word in question_tokens]
 
     assert len(question_ids) == len(question_tokens)
     return question_ids
-
 
 def test_indices(df, idx2word):
     '''
@@ -342,6 +341,11 @@ def create_glove_matrix():
 
     return glove_dict
 
+def word2idx_mapper(word2idx, word):
+    return word2idx.get(word, 0)
+
+def idx2word_mapper(idx2word, idx):
+    idx2word.get(idx, '<unk>')
 
 def create_word_embedding(glove_dict, word_vocab):
     '''

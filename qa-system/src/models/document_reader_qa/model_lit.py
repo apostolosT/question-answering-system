@@ -6,15 +6,14 @@ import torch.nn.functional as F
 from torch import nn
 
 
-class qaLightning(pl.LightningModule):
+class QuALit(pl.LightningModule):
 
     def __init__(self, model, optimizer_lr=0.001, device=None, idx2word=None, evaluate_func=None):
         super().__init__()
         self.model = model
+        self.dropout = nn.Dropout()
         self.lr = optimizer_lr
         self.device_ = device
-        # if device:
-            # model = model.to(device)
         if not idx2word:
             raise NotImplementedError("idx2word not defined")
         if not evaluate_func:
@@ -22,6 +21,7 @@ class qaLightning(pl.LightningModule):
                 "Evaluation Function for validation not defined")
         self.idx2word = idx2word
         self.evaluate_func = evaluate_func
+        # self.save_hyperparameters(ignore=['model'])
 
     def training_step(self, batch, batch_idx):
         context, question, context_mask, question_mask, label, ctx, ans, ids = batch
@@ -76,16 +76,15 @@ class qaLightning(pl.LightningModule):
             predictions[id] = pred
             answers[id] = ans[i]
         return (predictions, answers)
-    
+
     def predict_step(self, batch, batch_idx):
+        self.dropout.train()
         context, question, context_mask, question_mask = batch
 
         preds = self.model(context, question, context_mask, question_mask)
         p1, p2 = preds
         # for preds
         batch_size, c_len = p1.size()
-
-        predictions = {}
 
         ls = nn.LogSoftmax(dim=1)
         mask = (torch.ones(c_len, c_len, device=self.device) * float('-inf')
@@ -94,14 +93,10 @@ class qaLightning(pl.LightningModule):
         score, s_idx = score.max(dim=1)
         score, e_idx = score.max(dim=1)
         s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze()
+        pred = context[0][s_idx:e_idx + 1]
+        pred = ' '.join([self.idx2word[idx.item()] for idx in pred])
 
-        for i in range(batch_size):
-            pred = context[i][s_idx[i]:e_idx[i] + 1]
-            pred = ' '.join([self.idx2word[idx.item()] for idx in pred])
-            predictions[i] = pred
-        
-        return predictions
-
+        return pred
 
     def training_epoch_end(self, training_step_outputs):
         loss = [x['loss'].item() for x in training_step_outputs]

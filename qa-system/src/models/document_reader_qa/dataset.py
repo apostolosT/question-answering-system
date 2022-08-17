@@ -1,4 +1,5 @@
 import os
+from typing import List
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, dataset
@@ -16,7 +17,6 @@ class QuADataset(Dataset):
         """
 
         self.df = pd.read_pickle(pickle_file_path)
-        # self.df = self.df[:100]
         self.max_context_length = max(len(ctx) for ctx in self.df.context_ids)
         self.max_question_length = max(len(ctx) for ctx in self.df.question_ids)
 
@@ -58,6 +58,47 @@ class QuADataset(Dataset):
             context_text,
             answer_text,
             id
+        )
+
+    def get_span(self, text):
+        text = nlp(text, disable=['parser', 'tagger', 'ner'])
+        span = [(w.idx, w.idx + len(w.text)) for w in text]
+        return span
+
+class PredictDataset(Dataset):
+    def __init__(self, prediction_sample: List) -> None:
+        self.example = prediction_sample
+        self.max_context_length = 809
+        self.max_question_length = 60
+
+    def __len__(self):
+        return len(self.example)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        spans = []
+        context_text = []
+        batch = self.example[idx]
+        context_text.append(batch['context'])
+        spans.append(self.get_span(batch['context']))
+
+        # Fills the elements of the tensor with value 1 by selecting the indices in the order given in index.
+        padded_context = torch.LongTensor(self.max_context_length).fill_(1)
+        padded_context[:len(batch['context_ids'])] = torch.LongTensor(batch['context_ids'])
+
+        padded_question = torch.LongTensor(self.max_question_length).fill_(1)
+        padded_question[:len(batch['question_ids'])] = torch.LongTensor(batch['question_ids'])
+
+        context_mask = torch.eq(padded_context, 1)
+        question_mask = torch.eq(padded_question, 1)
+
+        return (
+            padded_context,
+            padded_question,
+            context_mask,
+            question_mask
         )
 
     def get_span(self, text):

@@ -11,7 +11,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 from src.models.document_reader_qa.model import QuAModel
 from src.models.document_reader_qa.dataset import QuADataset
-from src.models.document_reader_qa.model_lit import qaLightning
+from src.models.document_reader_qa.model_lit import QuALit
 
 
 def train():
@@ -59,7 +59,7 @@ def train():
         device,
         "../../../datasets/squad/processed/weights-matrix.npy")
 
-    litmodel = qaLightning(
+    litmodel = QuALit(
         model,
         idx2word=idx2word,
         evaluate_func=evaluate_func,

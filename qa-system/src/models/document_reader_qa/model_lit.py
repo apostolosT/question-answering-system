@@ -26,13 +26,6 @@ class qaLightning(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         context, question, context_mask, question_mask, label, ctx, ans, ids = batch
 
-        # place the tensors on GPU if not already there
-        # if self.device and not context.is_cuda:
-        #     context = context.to(self.device)
-        #     question = question.to(self.device)
-        #     context_mask = context_mask.to(self.device)
-        #     question_mask = question_mask.to(self.device)
-        #     label = label.to(self.device)
         preds = self.model(context, question, context_mask, question_mask)
 
         # forward pass, get the predictions
@@ -48,14 +41,6 @@ class qaLightning(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         context, question, context_mask, question_mask, label, ctx, ans, ids = batch
-
-        # if self.device and not context.is_cuda:
-        #     context = context.to(self.device)
-        #     question = question.to(self.device)
-        #     context_mask = context_mask.to(self.device)
-        #     question_mask = question_mask.to(self.device)
-        #     label = label.to(self.device)
-        # place the tensors on GPU
 
         preds = self.model(context, question, context_mask, question_mask)
 
@@ -91,6 +76,32 @@ class qaLightning(pl.LightningModule):
             predictions[id] = pred
             answers[id] = ans[i]
         return (predictions, answers)
+    
+    def predict_step(self, batch, batch_idx):
+        context, question, context_mask, question_mask = batch
+
+        preds = self.model(context, question, context_mask, question_mask)
+        p1, p2 = preds
+        # for preds
+        batch_size, c_len = p1.size()
+
+        predictions = {}
+
+        ls = nn.LogSoftmax(dim=1)
+        mask = (torch.ones(c_len, c_len, device=self.device) * float('-inf')
+                ).tril(-1).unsqueeze(0).expand(batch_size, -1, -1)
+        score = (ls(p1).unsqueeze(2) + ls(p2).unsqueeze(1)) + mask
+        score, s_idx = score.max(dim=1)
+        score, e_idx = score.max(dim=1)
+        s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze()
+
+        for i in range(batch_size):
+            pred = context[i][s_idx[i]:e_idx[i] + 1]
+            pred = ' '.join([self.idx2word[idx.item()] for idx in pred])
+            predictions[i] = pred
+        
+        return predictions
+
 
     def training_epoch_end(self, training_step_outputs):
         loss = [x['loss'].item() for x in training_step_outputs]

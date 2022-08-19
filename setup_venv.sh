@@ -17,7 +17,7 @@ echo "Setting up virtual environments for services..."
 cd "$service"
 pyenv virtualenv -f "$PYTHON_VERSION" "$service"
 VIRTUALENV_NAME="$service"
-pyenv local "$PYTHON_VERSION"/envs/"$VIRTUALENV_NAME"
+pyenv local $VIRTUALENV_NAME
 cd -
 
 

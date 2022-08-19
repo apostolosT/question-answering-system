@@ -17,13 +17,7 @@ from src.models.qa_model.model import QuAModel
 from src.models.qa_model.dataset import QuADataset
 from src.models.qa_model.model_lit import QuALit
 
-TRAIN_PATH = "../datasets/squad/processed/train.pickle"
-VAL_PATH = "../datasets/squad/processed/val.pickle"
-IDX2WORD_PATH = "../datasets/squad/processed/idx2word.pickle"
-WEIGHTS_MATRIX_PATH = "../datasets/squad/processed/weights-matrix.npy"
-RAW_VAL_SET_PATH = "../datasets/squad/raw/SQuAD-v1.1-dev.json"
-LOGS_PATH = "../logs"
-
+from src.paths import TRAIN_SET_PATH, VAL_SET_PATH, IDX2WORD_PATH, LOGS_PATH, RAW_VAL_SET_PATH
 
 def train():
 
@@ -33,8 +27,8 @@ def train():
     g = torch.Generator()
     g.manual_seed(42)
 
-    train_set = QuADataset(TRAIN_PATH)
-    val_set = QuADataset(VAL_PATH)
+    train_set = QuADataset(TRAIN_SET_PATH)
+    val_set = QuADataset(VAL_SET_PATH)
 
     trainloader = torch.utils.data.DataLoader(
         train_set,

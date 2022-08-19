@@ -68,8 +68,3 @@ def predict_answer(context, question):
 
     return pred
 
-context = "Super Bowl 50 was an American football game to determine the champion of the National Football League (NFL) for the 2015 season. The American Football Conference (AFC) champion Denver Broncos defeated the National Football Conference (NFC) champion Carolina Panthers 24-10 to earn their third Super Bowl title. The game was played on February 7, 2016, at Levi's Stadium in the San Francisco Bay Area at Santa Clara, California"
-question = "What is the AFC short for?"
-
-# ans = predict_answer(context, question)
-# print(ans)

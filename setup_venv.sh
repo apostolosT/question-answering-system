@@ -6,8 +6,8 @@ PYTHON_VERSION=3.10.6
 # NOTE: Before installing python, make sure you have libsqlite3-dev, python3-tk, libffi-dev packages installed
 
 # Install python
-# echo "Install python $PYTHON_VERSION..."
-# pyenv install -s "$PYTHON_VERSION"
+echo "Install python $PYTHON_VERSION..."
+pyenv install -s "$PYTHON_VERSION"
 
 # Services
 service=qa-system

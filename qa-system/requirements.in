@@ -5,9 +5,10 @@ jupyter
 matplotlib
 nltk
 pytest
-torch==1.12.1+cu116
+torch
 torchtext
 pytorch-lightning==1.7.1
 torchmetrics<0.8
-wandb==0.12.17
+flask 
+flasgger
 flake8

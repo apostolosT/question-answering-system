@@ -1,5 +1,7 @@
+import imp
 import numpy as np
 import pandas as pd
+import string
 import json
 import spacy
 from collections import Counter
@@ -140,36 +142,6 @@ def build_word_vocab(vocab_text):
     return word2idx, idx2word, word_vocab
 
 
-def build_char_vocab(vocab_text):
-    '''
-    Builds a character-level vocabulary from the given text.
-
-    :param list vocab_text: list of contexts and questions
-    :returns
-        dict char2idx: character to index mapping of words
-        list char_vocab: list of characters sorted by frequency
-    '''
-
-    chars = []
-    for sent in vocab_text:
-        for ch in sent:
-            chars.append(ch)
-
-    char_counter = Counter(chars)
-    char_vocab = sorted(char_counter, key=char_counter.get, reverse=True)
-    print(f"raw-char-vocab: {len(char_vocab)}")
-    high_freq_char = [char for char,
-                      count in char_counter.items() if count >= 20]
-    char_vocab = list(set(char_vocab).intersection(set(high_freq_char)))
-    print(f"char-vocab-intersect: {len(char_vocab)}")
-    char_vocab.insert(0, '<unk>')
-    char_vocab.insert(1, '<pad>')
-    char2idx = {char: idx for idx, char in enumerate(char_vocab)}
-    print(f"char2idx-length: {len(char2idx)}")
-
-    return char2idx, char_vocab
-
-
 def context_to_ids(text, word2idx):
     '''
     Converts context text to their respective ids by mapping each word
@@ -273,6 +245,8 @@ def get_error_indices(df, idx2word):
 
     return err_idx
 
+def get_context_tokens(context):
+    return [t for t in nlp(context, disable=['parser', 'tagger', 'ner'])]
 
 def index_answer(row, idx2word):
     '''
@@ -361,3 +335,23 @@ def create_word_embedding(glove_dict, word_vocab):
         except Exception as e:
             pass
     return weights_matrix, words_found
+
+def normalize_text(s):
+    '''
+    Performs a series of cleaning steps on the ground truth and
+    predicted answer.
+    '''
+    def remove_articles(text):
+        return re.sub(r'\b(a|an|the)\b', ' ', text)
+
+    def white_space_fix(text):
+        return ' '.join(text.split())
+
+    def remove_punc(text):
+        exclude = set(string.punctuation)
+        return ''.join(ch for ch in text if ch not in exclude)
+
+    def lower(text):
+        return text.lower()
+
+    return white_space_fix(remove_articles(remove_punc(lower(s))))

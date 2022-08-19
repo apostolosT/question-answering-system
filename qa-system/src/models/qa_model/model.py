@@ -7,8 +7,10 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-# Modules
+from src import paths
 
+# Modules
+GLOVE_MATRIX_PATH = paths.WEIGHTS_MATRIX_PATH
 
 class AlignQuestionEmbedding(nn.Module):
 
@@ -139,9 +141,15 @@ class BilinearAttentionLayer(nn.Module):
 
 class QuAModel(nn.Module):
 
-    def __init__(self, hidden_dim, embedding_dim, num_layers, num_directions, dropout, device, glove_matrix_path):
+    def __init__(self, params: dict):
 
         super().__init__()
+
+        hidden_dim = params["HIDDEN_DIM"]
+        embedding_dim = params["EMB_DIM"]
+        num_layers = params["NUM_LAYERS"]
+        num_directions = params["NUM_DIRECTIONS"]
+        dropout = params["DROPOUT"]
 
         self.context_birnn = StackedBiRNN(
             embedding_dim * 2, hidden_dim, num_layers, dropout)
@@ -149,7 +157,7 @@ class QuAModel(nn.Module):
         self.question_birnn = StackedBiRNN(
             embedding_dim, hidden_dim, num_layers, dropout)
 
-        self.glove_embedding = self.get_glove_embedding(glove_matrix_path)
+        self.glove_embedding = self.get_glove_embedding(GLOVE_MATRIX_PATH)
 
         def tune_embedding(grad, words=1000):
             grad[words:] = 0

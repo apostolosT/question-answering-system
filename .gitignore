@@ -151,4 +151,7 @@ AISERA NLP Coding exercise.docx
 qa-system/datasets/squad/processed/*
 qa-system/models/*
 qa-system/embeddings/*
+qa-system/logs
 
+qa-system/datasets/squad/raw/SQuAD-v1.1-dev.json
+qa-system/datasets/squad/raw/SQuAD-v1.1-train.json

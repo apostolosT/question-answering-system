@@ -9,24 +9,32 @@ import torch
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
-from src.models.document_reader_qa.model import QuAModel
-from src.models.document_reader_qa.dataset import QuADataset
-from src.models.document_reader_qa.model_lit import QuALit
+from configs.model import params, device
+
+from src.data.utils import normalize_text
+
+from src.models.qa_model.model import QuAModel
+from src.models.qa_model.dataset import QuADataset
+from src.models.qa_model.model_lit import QuALit
+
+TRAIN_PATH = "../datasets/squad/processed/train.pickle"
+VAL_PATH = "../datasets/squad/processed/val.pickle"
+IDX2WORD_PATH = "../datasets/squad/processed/idx2word.pickle"
+WEIGHTS_MATRIX_PATH = "../datasets/squad/processed/weights-matrix.npy"
+RAW_VAL_SET_PATH = "../datasets/squad/raw/SQuAD-v1.1-dev.json"
+LOGS_PATH = "../logs"
 
 
 def train():
 
-    torch.manual_seed(10)
+    torch.manual_seed(42)
 
     # For shuffle dataloader
     g = torch.Generator()
-    g.manual_seed(10)
+    g.manual_seed(42)
 
-    train_path = "../../../datasets/squad/processed/train.pickle"
-    train_set = QuADataset(train_path)
-    val_path = "../../../datasets/squad/processed/val.pickle"
-    val_set = QuADataset(val_path)
-    # Reduce size for testing
+    train_set = QuADataset(TRAIN_PATH)
+    val_set = QuADataset(VAL_PATH)
 
     trainloader = torch.utils.data.DataLoader(
         train_set,
@@ -38,33 +46,24 @@ def train():
         val_set,
         batch_size=16,
     )
-    with open("../../../datasets/squad/processed/idx2word.pickle", 'rb') as file:
+    with open(IDX2WORD_PATH, 'rb') as file:
         import pickle
         idx2word = pickle.load(file)
+
     evaluate_func = evaluate
-    # Model
-    HIDDEN_DIM = 128
-    EMB_DIM = 300
-    NUM_LAYERS = 3
-    NUM_DIRECTIONS = 2
-    DROPOUT = 0.3
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # Hyper Params
+    lr = 0.001
 
     model = QuAModel(
-        HIDDEN_DIM,
-        EMB_DIM,
-        NUM_LAYERS,
-        NUM_DIRECTIONS,
-        DROPOUT,
-        device,
-        "../../../datasets/squad/processed/weights-matrix.npy")
+        params
+    )
 
     litmodel = QuALit(
         model,
         idx2word=idx2word,
         evaluate_func=evaluate_func,
         device=device,
-        optimizer_lr=0.001)
+        optimizer_lr=lr)
 
     val_checkpoint = ModelCheckpoint(
         filename="{epoch}-{step}-{val_loss:.1f}",
@@ -87,10 +86,10 @@ def train():
         patience=1
     )
 
-    logger = TensorBoardLogger('tb_logs', name='dr_model')
+    logger = TensorBoardLogger(LOGS_PATH, name='dr_model')
 
     trainer = pl.Trainer(
-        max_epochs=5,
+        max_epochs=10,
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
         gradient_clip_val=10,
         devices=1,
@@ -100,7 +99,7 @@ def train():
             early_stopping
         ],
         logger=logger,
-        default_root_dir='../../../models'
+        default_root_dir=LOGS_PATH
     )
 
     trainer.fit(litmodel, trainloader, validloader)
@@ -124,7 +123,7 @@ def evaluate(predictions, **kwargs):
     '''
 
     # TODO: Change to correct directory
-    with open('../../../datasets/squad/raw/SQuAD-v1.1-dev.json', 'r', encoding='utf-8') as f:
+    with open(RAW_VAL_SET_PATH, 'r', encoding='utf-8') as f:
         dataset = json.load(f)
 
     dataset = dataset['data']
@@ -151,61 +150,6 @@ def evaluate(predictions, **kwargs):
     return exact_match, f1
 
 
-def evaluate_single(predictions, answers, **kwargs):
-    '''
-    Gets a dictionary of predictions with question_id as key
-    and prediction as value. The validation dataset has multiple
-    answers for a single question. Hence we compare our prediction
-    with all the answers and choose the one that gives us
-    the maximum metric (em or f1).
-    This method first parses the JSON file, gets all the answers
-    for a given id and then passes the list of answers and the
-    predictions to calculate em, f1.
-    :param dict predictions
-    Returns
-    : exact_match: 1 if the prediction and ground truth
-      match exactly, 0 otherwise.
-    : f1_score:
-    '''
-    assert len(predictions) == len(answers)
-    f1 = exact_match = total = 0
-    for key, value in predictions.items():
-        prediction = value
-        ground_truths = [answers[key]]
-
-        exact_match += metric_max_over_ground_truths(
-            exact_match_score, prediction, ground_truths)
-        f1 += metric_max_over_ground_truths(f1_score,
-                                            prediction, ground_truths)
-
-    total = len(predictions)
-    exact_match = 100.0 * exact_match / total
-    f1 = 100.0 * f1 / total
-
-    return exact_match, f1
-
-
-def normalize_answer(s):
-    '''
-    Performs a series of cleaning steps on the ground truth and
-    predicted answer.
-    '''
-    def remove_articles(text):
-        return re.sub(r'\b(a|an|the)\b', ' ', text)
-
-    def white_space_fix(text):
-        return ' '.join(text.split())
-
-    def remove_punc(text):
-        exclude = set(string.punctuation)
-        return ''.join(ch for ch in text if ch not in exclude)
-
-    def lower(text):
-        return text.lower()
-
-    return white_space_fix(remove_articles(remove_punc(lower(s))))
-
-
 def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
     '''
     Returns maximum value of metrics for predicition by model against
@@ -228,8 +172,8 @@ def f1_score(prediction, ground_truth):
     '''
     Returns f1 score of two strings.
     '''
-    prediction_tokens = normalize_answer(prediction).split()
-    ground_truth_tokens = normalize_answer(ground_truth).split()
+    prediction_tokens = normalize_text(prediction).split()
+    ground_truth_tokens = normalize_text(ground_truth).split()
     common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
     num_same = sum(common.values())
     if num_same == 0:
@@ -244,7 +188,7 @@ def exact_match_score(prediction, ground_truth):
     '''
     Returns exact_match_score of two strings.
     '''
-    return (normalize_answer(prediction) == normalize_answer(ground_truth))
+    return (normalize_text(prediction) == normalize_text(ground_truth))
 
 
 def epoch_time(start_time, end_time):

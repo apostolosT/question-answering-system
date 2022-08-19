@@ -1,9 +1,11 @@
+from doctest import Example
 import os
 from typing import List
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, dataset
 import spacy
+from src.data.utils import get_context_tokens
 
 nlp = spacy.load('en_core_web_sm', disable=["tagger", "ner", "lemmatizer"])
 
@@ -34,7 +36,6 @@ class QuADataset(Dataset):
 
         context_text.append(batch.context)
         spans.append(self.get_span(batch.context))
-
         answer_text.append(batch.answer)
 
         # Fills the elements of the tensor with value 1 by selecting the indices in the order given in index.
@@ -68,8 +69,8 @@ class QuADataset(Dataset):
 class PredictDataset(Dataset):
     def __init__(self, prediction_sample: List) -> None:
         self.example = prediction_sample
-        self.max_context_length = 809
-        self.max_question_length = 60
+        self.max_context_length = len(prediction_sample[0]['context_ids'])
+        self.max_question_length = len(prediction_sample[0]['question_ids'])
 
     def __len__(self):
         return len(self.example)
@@ -93,12 +94,11 @@ class PredictDataset(Dataset):
 
         context_mask = torch.eq(padded_context, 1)
         question_mask = torch.eq(padded_question, 1)
-
         return (
             padded_context,
             padded_question,
             context_mask,
-            question_mask
+            question_mask,
         )
 
     def get_span(self, text):
